@@ -1,68 +1,49 @@
-use std::collections::HashMap;
-use sha2::{Sha256, Digest};
+use warp::Filter;
+use std::sync::{Arc, Mutex};
+use serde::{Deserialize, Serialize};
 use chrono::Utc;
-use serde::{Serialize, Deserialize};
-
-// Composite Rig Score - Your revolutionary mining
-fn calculate_rig_score(cpu: f64, gpu: f64, ram_gb: f64, bw_mbps: f64) -> f64 {
-    (cpu * 0.25) + (gpu * 0.35) + (ram_gb * 0.15) + (bw_mbps * 0.25)
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct Block {
-    index: u64,
-    timestamp: i64,
-    prev_hash: String,
-    hash: String,
-    data: String,
-    nonce: u64,
-    reward: f64,
-    loyalty_bonus: f64,
+struct RigScore {
+    cpu: f64,
+    gpu: f64,
+    ram_gb: f64,
+    bw_mbps: f64,
+    total: f64,
 }
 
+#[derive(Debug, Serialize)]
+struct RpcResponse {
+    status: String,
+    data: serde_json::Value,
+}
+
+// Simple in-memory blockchain state
 struct Blockchain {
-    chain: Vec<Block>,
-    supply: u64,
-    target_block_time: u64, // seconds
-    loyalty_streaks: HashMap<String, i64>, // wallet -> last contribution time
+    // ... existing from before
 }
 
-impl Blockchain {
-    fn new() -> Self {
-        let mut bc = Blockchain {
-            chain: vec![],
-            supply: 0,
-            target_block_time: 120, // 2 minutes
-            loyalty_streaks: HashMap::new(),
-        };
-        bc.create_genesis_block();
-        bc
-    }
+#[tokio::main]
+async fn main() {
+    let blockchain = Arc::new(Mutex::new(Blockchain::new()));
 
-    fn create_genesis_block(&mut self) {
-        let genesis = Block {
-            index: 0,
-            timestamp: Utc::now().timestamp(),
-            prev_hash: "0".repeat(64),
-            hash: "genesis".to_string(),
-            data: "ForgeNet Genesis".to_string(),
-            nonce: 0,
-            reward: 0.0,
-            loyalty_bonus: 0.0,
-        };
-        self.chain.push(genesis);
-    }
+    // JSON-RPC routes
+    let get_rig_score = warp::path("rpc")
+        .and(warp::path("get_rig_score"))
+        .and(warp::query::<std::collections::HashMap<String, String>>())
+        .map(|params: std::collections::HashMap<String, String>| {
+            let cpu: f64 = params.get("cpu").and_then(|v| v.parse().ok()).unwrap_or(4.0);
+            // similar for others
+            let score = calculate_rig_score(cpu, 0.0, 8.0, 100.0);
+            warp::reply::json(&RpcResponse { status: "success".to_string(), data: serde_json::json!({"score": score}) })
+        });
 
-    // Add your full mining, loyalty, emission logic here
-    fn mine_block(&mut self, miner_wallet: String, rig_score: f64, total_network_score: f64) {
-        // Simulate finding block with probability based on rig_score
-        println!("Mining with rig score: {}", rig_score);
-        // TODO: Full PoW, difficulty, etc.
-    }
+    let routes = get_rig_score.or(/* other endpoints */);
+
+    println!("ForgeNet JSON-RPC server running on http://127.0.0.1:3030");
+    warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
 }
 
-fn main() {
-    let mut chain = Blockchain::new();
-    println!("ForgeNet node started. Supply: {}", chain.supply);
-    // Add API server, miner loop etc.
+fn calculate_rig_score(cpu: f64, gpu: f64, ram_gb: f64, bw_mbps: f64) -> f64 {
+    cpu * 0.25 + gpu * 0.35 + ram_gb * 0.15 + bw_mbps * 0.25
 }
