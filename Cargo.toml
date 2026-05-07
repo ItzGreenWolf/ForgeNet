@@ -11,5 +11,7 @@ serde_json = "1.0"
 chrono = "0.4"
 tokio = { version = "1", features = ["full"] }
 warp = "0.3"
-warp-json-rpc = "0.1"  # if available, else we'll use manual
+sled = "0.34"
 rand = "0.8"
+ed25519-dalek = "2.1"
+bs58 = "0.5"
